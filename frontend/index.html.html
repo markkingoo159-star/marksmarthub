@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>MarkSmartHub</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .box {
+      background: #1e293b;
+      padding: 20px;
+      margin: 20px auto;
+      width: 300px;
+      border-radius: 10px;
+    }
+
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      width: 90%;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>MarkSmartHub</h1>
+
+<div class="box">
+  <h2>Register</h2>
+  <input id="regUser" placeholder="Username">
+  <input id="regPass" type="password" placeholder="Password">
+  <button onclick="register()">Register</button>
+</div>
+
+<div class="box">
+  <h2>Login</h2>
+  <input id="logUser" placeholder="Username">
+  <input id="logPass" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+</div>
+
+<div class="box">
+  <h2>Dashboard</h2>
+  <p id="balance">Balance: $0</p>
+</div>
+
+<script>
+let currentUser = "";
+
+async function register() {
+  await fetch("http://localhost:5000/register", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      username: regUser.value,
+      password: regPass.value
+    })
+  });
+
+  alert("Registered successfully!");
+}
+
+async function login() {
+  const res = await fetch("http://localhost:5000/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      username: logUser.value,
+      password: logPass.value
+    })
+  });
+
+  const data = await res.json();
+
+  if (data.user) {
+    currentUser = data.user.username;
+    loadBalance();
+  } else {
+    alert("Login failed");
+  }
+}
+
+async function loadBalance() {
+  const res = await fetch(`http://localhost:5000/balance/${currentUser}`);
+  const data = await res.json();
+  balance.innerText = "Balance: $" + data.balance;
+}
+</script>
+
+</body>
+</html>
