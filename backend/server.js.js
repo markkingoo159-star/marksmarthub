@@ -6,22 +6,13 @@ const mongoose = require("mongoose");
 
 const app = express();
 
-/* =========================
-   MIDDLEWARE
-========================= */
 app.use(cors());
 app.use(express.json());
 
-/* =========================
-   MONGODB CONNECTION
-========================= */
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log("MongoDB Error:", err));
 
-/* =========================
-   USER MODEL
-========================= */
 const UserSchema = new mongoose.Schema({
   username: String,
   password: String,
@@ -30,11 +21,18 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", UserSchema);
 
-/* =========================
-   ROUTES
-========================= */
+const DepositSchema = new mongoose.Schema({
+  username: String,
+  amount: Number,
+  phone: String,
+  status: { type: String, default: "pending" },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Deposit = mongoose.model("Deposit", DepositSchema);
+
 app.get("/", (req, res) => {
-  res.send("API is running...");
+  res.send("MarkSmartHub API is running...");
 });
 
 app.post("/register", async (req, res) => {
@@ -51,7 +49,7 @@ app.post("/register", async (req, res) => {
 
     res.json({ message: "User registered successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Register error" });
+    res.status(500).json({ message: "Register error", error: err.message });
   }
 });
 
@@ -67,23 +65,53 @@ app.post("/login", async (req, res) => {
 
     res.json({ message: "Login success", user });
   } catch (err) {
-    res.status(500).json({ message: "Login error" });
+    res.status(500).json({ message: "Login error", error: err.message });
   }
 });
 
 app.get("/balance/:username", async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username });
-
     res.json({ balance: user ? user.balance : 0 });
   } catch (err) {
-    res.status(500).json({ message: "Balance error" });
+    res.status(500).json({ message: "Balance error", error: err.message });
   }
 });
 
-/* =========================
-   START SERVER
-========================= */
+app.post("/deposit", async (req, res) => {
+  try {
+    const { username, amount, phone } = req.body;
+
+    if (!username || !amount || !phone) {
+      return res.status(400).json({ message: "Username, amount, and phone are required" });
+    }
+
+    const deposit = new Deposit({
+      username,
+      amount,
+      phone
+    });
+
+    await deposit.save();
+
+    res.json({
+      message: "Deposit request submitted successfully",
+      deposit
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Deposit error", error: err.message });
+  }
+});
+
+app.get("/deposits/:username", async (req, res) => {
+  try {
+    const deposits = await Deposit.find({ username: req.params.username }).sort({ createdAt: -1 });
+    res.json(deposits);
+  } catch (err) {
+    res.status(500).json({ message: "Deposits fetch error", error: err.message });
+  }
+});
+
 app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
   console.log("Server running");
 });
