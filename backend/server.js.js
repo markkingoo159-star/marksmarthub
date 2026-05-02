@@ -148,9 +148,7 @@ app.get("/paystack/callback", async (req, res) => {
   try {
     const reference = req.query.reference;
 
-    if (!reference) {
-      return res.send("Missing payment reference");
-    }
+    if (!reference) return res.send("Missing payment reference");
 
     const verify = await axios.get(
       `https://api.paystack.co/transaction/verify/${reference}`,
@@ -189,6 +187,25 @@ app.get("/paystack/callback", async (req, res) => {
     res.send("Payment verified and balance credited. Return to MarkSmartHub.");
   } catch (err) {
     res.send("Payment verification error: " + err.message);
+  }
+});
+
+/* ADMIN ROUTES */
+app.get("/admin/users", async (req, res) => {
+  try {
+    const users = await User.find().sort({ username: 1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Users fetch error", error: err.message });
+  }
+});
+
+app.get("/admin/deposits", async (req, res) => {
+  try {
+    const deposits = await Deposit.find().sort({ createdAt: -1 });
+    res.json(deposits);
+  } catch (err) {
+    res.status(500).json({ message: "Deposits fetch error", error: err.message });
   }
 });
 
