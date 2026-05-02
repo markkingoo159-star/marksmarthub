@@ -105,7 +105,7 @@ app.post("/deposit", async (req, res) => {
       return res.status(400).json({ message: "Username, amount, and phone are required" });
     }
 
-    const deposit = new Deposit({ username, amount, phone });
+    const deposit = new Deposit({ username, amount: Number(amount), phone });
     await deposit.save();
 
     res.json({ message: "Deposit request submitted successfully", deposit });
@@ -226,6 +226,32 @@ app.get("/admin/deposits", checkAdmin, async (req, res) => {
     res.json(deposits);
   } catch (err) {
     res.status(500).json({ message: "Deposits fetch error", error: err.message });
+  }
+});
+
+app.post("/admin/deposits/:id/approve", checkAdmin, async (req, res) => {
+  try {
+    const deposit = await Deposit.findById(req.params.id);
+
+    if (!deposit) {
+      return res.status(404).json({ message: "Deposit not found" });
+    }
+
+    if (deposit.status === "success") {
+      return res.status(400).json({ message: "Deposit already approved" });
+    }
+
+    await User.findOneAndUpdate(
+      { username: deposit.username },
+      { $inc: { balance: Number(deposit.amount) } }
+    );
+
+    deposit.status = "success";
+    await deposit.save();
+
+    res.json({ message: "Deposit approved and balance updated", deposit });
+  } catch (err) {
+    res.status(500).json({ message: "Approve error", error: err.message });
   }
 });
 
