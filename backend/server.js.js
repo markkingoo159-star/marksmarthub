@@ -34,6 +34,16 @@ const DepositSchema = new mongoose.Schema({
 
 const Deposit = mongoose.model("Deposit", DepositSchema);
 
+function checkAdmin(req, res, next) {
+  const adminPassword = req.headers["x-admin-password"];
+
+  if (!adminPassword || adminPassword !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ message: "Unauthorized admin access" });
+  }
+
+  next();
+}
+
 app.get("/", (req, res) => {
   res.send("MarkSmartHub API is running...");
 });
@@ -66,15 +76,11 @@ app.post("/login", async (req, res) => {
 
     const user = await User.findOne({ username });
 
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, user.password);
 
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
     res.json({ message: "Login success", user });
   } catch (err) {
@@ -177,9 +183,7 @@ app.get("/paystack/callback", async (req, res) => {
 
     const payment = verify.data.data;
 
-    if (payment.status !== "success") {
-      return res.send("Payment not successful");
-    }
+    if (payment.status !== "success") return res.send("Payment not successful");
 
     const username = payment.metadata.username;
     const amount = Number(payment.metadata.amount);
@@ -206,7 +210,8 @@ app.get("/paystack/callback", async (req, res) => {
   }
 });
 
-app.get("/admin/users", async (req, res) => {
+/* SECURE ADMIN ROUTES */
+app.get("/admin/users", checkAdmin, async (req, res) => {
   try {
     const users = await User.find().sort({ username: 1 });
     res.json(users);
@@ -215,7 +220,7 @@ app.get("/admin/users", async (req, res) => {
   }
 });
 
-app.get("/admin/deposits", async (req, res) => {
+app.get("/admin/deposits", checkAdmin, async (req, res) => {
   try {
     const deposits = await Deposit.find().sort({ createdAt: -1 });
     res.json(deposits);
