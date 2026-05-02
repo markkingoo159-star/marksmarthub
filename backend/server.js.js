@@ -6,13 +6,22 @@ const mongoose = require("mongoose");
 
 const app = express();
 
+/* =========================
+   MIDDLEWARE
+========================= */
 app.use(cors());
 app.use(express.json());
 
+/* =========================
+   MONGODB CONNECTION
+========================= */
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log("MongoDB Error:", err));
 
+/* =========================
+   USER MODEL
+========================= */
 const UserSchema = new mongoose.Schema({
   username: String,
   password: String,
@@ -21,6 +30,9 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", UserSchema);
 
+/* =========================
+   ROUTES
+========================= */
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
@@ -39,7 +51,7 @@ app.post("/register", async (req, res) => {
 
     res.json({ message: "User registered successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Register error", error: err.message });
+    res.status(500).json({ message: "Register error" });
   }
 });
 
@@ -55,7 +67,7 @@ app.post("/login", async (req, res) => {
 
     res.json({ message: "Login success", user });
   } catch (err) {
-    res.status(500).json({ message: "Login error", error: err.message });
+    res.status(500).json({ message: "Login error" });
   }
 });
 
@@ -65,10 +77,13 @@ app.get("/balance/:username", async (req, res) => {
 
     res.json({ balance: user ? user.balance : 0 });
   } catch (err) {
-    res.status(500).json({ message: "Balance error", error: err.message });
+    res.status(500).json({ message: "Balance error" });
   }
 });
 
+/* =========================
+   START SERVER
+========================= */
 app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
   console.log("Server running");
 });
