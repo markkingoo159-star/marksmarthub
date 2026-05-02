@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const axios = require("axios");
 
 const app = express();
 
@@ -86,12 +87,7 @@ app.post("/deposit", async (req, res) => {
       return res.status(400).json({ message: "Username, amount, and phone are required" });
     }
 
-    const deposit = new Deposit({
-      username,
-      amount,
-      phone
-    });
-
+    const deposit = new Deposit({ username, amount, phone });
     await deposit.save();
 
     res.json({
@@ -110,6 +106,43 @@ app.get("/deposits/:username", async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Deposits fetch error", error: err.message });
   }
+});
+
+app.post("/paystack/initiate", async (req, res) => {
+  try {
+    const { email, amount, username } = req.body;
+
+    if (!email || !amount || !username) {
+      return res.status(400).json({ message: "Email, amount, and username are required" });
+    }
+
+    const response = await axios.post(
+      "https://api.paystack.co/transaction/initialize",
+      {
+        email,
+        amount: Number(amount) * 100,
+        metadata: { username },
+        callback_url: "https://marksmarthub-backend.onrender.com/paystack/callback"
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({
+      message: "Payment init error",
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+app.get("/paystack/callback", (req, res) => {
+  res.send("Payment received. You can return to MarkSmartHub.");
 });
 
 app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
