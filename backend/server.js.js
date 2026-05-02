@@ -27,6 +27,7 @@ const DepositSchema = new mongoose.Schema({
   amount: Number,
   phone: String,
   status: { type: String, default: "pending" },
+  reference: String,
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -41,9 +42,7 @@ app.post("/register", async (req, res) => {
     const { username, password } = req.body;
 
     const exists = await User.findOne({ username });
-    if (exists) {
-      return res.status(400).json({ message: "User already exists" });
-    }
+    if (exists) return res.status(400).json({ message: "User already exists" });
 
     const user = new User({ username, password });
     await user.save();
@@ -59,10 +58,7 @@ app.post("/login", async (req, res) => {
     const { username, password } = req.body;
 
     const user = await User.findOne({ username, password });
-
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
     res.json({ message: "Login success", user });
   } catch (err) {
@@ -90,10 +86,7 @@ app.post("/deposit", async (req, res) => {
     const deposit = new Deposit({ username, amount, phone });
     await deposit.save();
 
-    res.json({
-      message: "Deposit request submitted successfully",
-      deposit
-    });
+    res.json({ message: "Deposit request submitted successfully", deposit });
   } catch (err) {
     res.status(500).json({ message: "Deposit error", error: err.message });
   }
@@ -121,7 +114,7 @@ app.post("/paystack/initiate", async (req, res) => {
       {
         email,
         amount: Number(amount) * 100,
-        metadata: { username },
+        metadata: { username, amount },
         callback_url: "https://marksmarthub-backend.onrender.com/paystack/callback"
       },
       {
@@ -132,6 +125,16 @@ app.post("/paystack/initiate", async (req, res) => {
       }
     );
 
+    const reference = response.data.data.reference;
+
+    await Deposit.create({
+      username,
+      amount: Number(amount),
+      phone: "Paystack",
+      reference,
+      status: "pending"
+    });
+
     res.json(response.data);
   } catch (error) {
     res.status(500).json({
@@ -141,8 +144,52 @@ app.post("/paystack/initiate", async (req, res) => {
   }
 });
 
-app.get("/paystack/callback", (req, res) => {
-  res.send("Payment received. You can return to MarkSmartHub.");
+app.get("/paystack/callback", async (req, res) => {
+  try {
+    const reference = req.query.reference;
+
+    if (!reference) {
+      return res.send("Missing payment reference");
+    }
+
+    const verify = await axios.get(
+      `https://api.paystack.co/transaction/verify/${reference}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+        }
+      }
+    );
+
+    const payment = verify.data.data;
+
+    if (payment.status !== "success") {
+      return res.send("Payment not successful");
+    }
+
+    const username = payment.metadata.username;
+    const amount = Number(payment.metadata.amount);
+
+    const existingDeposit = await Deposit.findOne({ reference });
+
+    if (existingDeposit && existingDeposit.status === "success") {
+      return res.send("Payment already credited. Return to MarkSmartHub.");
+    }
+
+    await User.findOneAndUpdate(
+      { username },
+      { $inc: { balance: amount } }
+    );
+
+    await Deposit.findOneAndUpdate(
+      { reference },
+      { status: "success" }
+    );
+
+    res.send("Payment verified and balance credited. Return to MarkSmartHub.");
+  } catch (err) {
+    res.send("Payment verification error: " + err.message);
+  }
 });
 
 app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
