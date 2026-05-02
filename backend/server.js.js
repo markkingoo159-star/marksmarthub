@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const axios = require("axios");
+const bcrypt = require("bcryptjs");
 
 const app = express();
 
@@ -44,7 +45,13 @@ app.post("/register", async (req, res) => {
     const exists = await User.findOne({ username });
     if (exists) return res.status(400).json({ message: "User already exists" });
 
-    const user = new User({ username, password });
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new User({
+      username,
+      password: hashedPassword
+    });
+
     await user.save();
 
     res.json({ message: "User registered successfully" });
@@ -57,8 +64,17 @@ app.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const user = await User.findOne({ username, password });
-    if (!user) return res.status(401).json({ message: "Invalid credentials" });
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
     res.json({ message: "Login success", user });
   } catch (err) {
@@ -190,7 +206,6 @@ app.get("/paystack/callback", async (req, res) => {
   }
 });
 
-/* ADMIN ROUTES */
 app.get("/admin/users", async (req, res) => {
   try {
     const users = await User.find().sort({ username: 1 });
