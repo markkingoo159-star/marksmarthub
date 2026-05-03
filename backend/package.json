@@ -3,19 +3,24 @@
   "version": "1.0.0",
   "description": "MarkSmartHub Backend API",
   "main": "server.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": ["trading", "api", "marksmarthub"],
+  "keywords": [
+    "trading",
+    "api",
+    "marksmarthub"
+  ],
   "author": "MarkSmartHub",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "axios": "^1.6.8",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.6",
-    "dotenv": "^16.4.0",
-    "express": "^5.2.1",
-    "mongoose": "^8.3.0"
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "mongoose": "^8.3.0",
+    "ws": "^8.17.0"
   }
 }
