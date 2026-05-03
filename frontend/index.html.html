@@ -2,6 +2,8 @@
 <html>
 <head>
   <title>MarkSmartHub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
       font-family: Arial;
@@ -15,7 +17,7 @@
       background: #1e293b;
       padding: 20px;
       margin: 20px auto;
-      width: 300px;
+      width: 320px;
       border-radius: 10px;
     }
 
@@ -23,19 +25,33 @@
       padding: 10px;
       margin: 5px;
       width: 90%;
+      border-radius: 6px;
+      border: none;
     }
 
     button {
       background: #2563eb;
       color: white;
-      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button.green { background: #16a34a; }
+    button.red { background: #dc2626; }
+
+    #message {
+      background: #020617;
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
     }
   </style>
 </head>
 
 <body>
 
-<h1>MarkSmartHub</h1>
+<h1>🚀 MarkSmartHub</h1>
 
 <div class="box">
   <h2>Register</h2>
@@ -53,49 +69,211 @@
 
 <div class="box">
   <h2>Dashboard</h2>
+  <p id="loggedIn">Not logged in</p>
   <p id="balance">Balance: $0</p>
+  <button onclick="loadBalance()">Refresh Balance</button>
+</div>
+
+<div class="box">
+  <h2>Deriv Token</h2>
+  <input id="derivToken" type="password" placeholder="Paste Deriv token">
+  <button onclick="saveDerivToken()">Save Token</button>
+  <button class="green" onclick="checkDerivBalance()">Check Deriv Balance</button>
+</div>
+
+<div class="box">
+  <h2>Real Trade</h2>
+  <input id="stake" type="number" value="1" placeholder="Stake">
+  <select id="symbol" style="padding:10px;margin:5px;width:90%;border-radius:6px;border:none;">
+    <option value="R_50">Volatility 50</option>
+    <option value="R_75">Volatility 75</option>
+    <option value="R_100">Volatility 100</option>
+    <option value="BOOM1000">Boom 1000</option>
+    <option value="CRASH1000">Crash 1000</option>
+  </select>
+  <button class="green" onclick="placeTrade('CALL')">BUY / RISE</button>
+  <button class="red" onclick="placeTrade('PUT')">SELL / FALL</button>
+</div>
+
+<div class="box">
+  <h2>Result</h2>
+  <pre id="message">Waiting...</pre>
 </div>
 
 <script>
-let currentUser = "";
+const API = "https://marksmarthub-backend.onrender.com";
+
+let currentUser = localStorage.getItem("currentUser") || "";
+
+if (currentUser) {
+  document.getElementById("loggedIn").innerText = "Logged in as: " + currentUser;
+  loadBalance();
+}
+
+function show(data) {
+  document.getElementById("message").innerText =
+    typeof data === "string" ? data : JSON.stringify(data, null, 2);
+}
 
 async function register() {
-  await fetch("http://localhost:5000/register", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      username: regUser.value,
-      password: regPass.value
-    })
-  });
+  const username = document.getElementById("regUser").value.trim();
+  const password = document.getElementById("regPass").value.trim();
 
-  alert("Registered successfully!");
+  if (!username || !password) {
+    alert("Enter username and password");
+    return;
+  }
+
+  try {
+    const res = await fetch(API + "/register", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+    show(data);
+    alert(data.message || "Register completed");
+
+  } catch (err) {
+    show("Connection error. Check backend or internet.");
+  }
 }
 
 async function login() {
-  const res = await fetch("http://localhost:5000/login", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      username: logUser.value,
-      password: logPass.value
-    })
-  });
+  const username = document.getElementById("logUser").value.trim();
+  const password = document.getElementById("logPass").value.trim();
 
-  const data = await res.json();
+  if (!username || !password) {
+    alert("Enter username and password");
+    return;
+  }
 
-  if (data.user) {
-    currentUser = data.user.username;
-    loadBalance();
-  } else {
-    alert("Login failed");
+  try {
+    const res = await fetch(API + "/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+    show(data);
+
+    if (data.user) {
+      currentUser = data.user.username;
+      localStorage.setItem("currentUser", currentUser);
+      document.getElementById("loggedIn").innerText = "Logged in as: " + currentUser;
+      loadBalance();
+    } else {
+      alert(data.message || "Login failed");
+    }
+
+  } catch (err) {
+    show("Connection error. Check backend or internet.");
   }
 }
 
 async function loadBalance() {
-  const res = await fetch(`http://localhost:5000/balance/${currentUser}`);
-  const data = await res.json();
-  balance.innerText = "Balance: $" + data.balance;
+  if (!currentUser) {
+    alert("Login first");
+    return;
+  }
+
+  try {
+    const res = await fetch(API + "/balance/" + currentUser);
+    const data = await res.json();
+
+    document.getElementById("balance").innerText = "Balance: $" + (data.balance || 0);
+    show(data);
+
+  } catch (err) {
+    show("Balance error");
+  }
+}
+
+async function saveDerivToken() {
+  if (!currentUser) {
+    alert("Login first");
+    return;
+  }
+
+  const derivToken = document.getElementById("derivToken").value.trim();
+
+  if (!derivToken) {
+    alert("Paste Deriv token first");
+    return;
+  }
+
+  try {
+    const res = await fetch(API + "/user/deriv-token", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        username: currentUser,
+        derivToken
+      })
+    });
+
+    const data = await res.json();
+    show(data);
+    alert(data.message || "Token saved");
+
+  } catch (err) {
+    show("Token save error");
+  }
+}
+
+async function checkDerivBalance() {
+  if (!currentUser) {
+    alert("Login first");
+    return;
+  }
+
+  try {
+    const res = await fetch(API + "/user/" + currentUser + "/deriv-balance");
+    const data = await res.json();
+    show(data);
+
+  } catch (err) {
+    show("Deriv balance error");
+  }
+}
+
+async function placeTrade(contract) {
+  if (!currentUser) {
+    alert("Login first");
+    return;
+  }
+
+  const amount = Number(document.getElementById("stake").value);
+  const symbol = document.getElementById("symbol").value;
+
+  if (!amount || amount <= 0) {
+    alert("Enter valid stake");
+    return;
+  }
+
+  show("Placing trade...");
+
+  try {
+    const res = await fetch(API + "/user/" + currentUser + "/deriv-trade", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        amount,
+        symbol,
+        contract,
+        duration: 5,
+        durationUnit: "t"
+      })
+    });
+
+    const data = await res.json();
+    show(data);
+
+  } catch (err) {
+    show("Trade error");
+  }
 }
 </script>
 
